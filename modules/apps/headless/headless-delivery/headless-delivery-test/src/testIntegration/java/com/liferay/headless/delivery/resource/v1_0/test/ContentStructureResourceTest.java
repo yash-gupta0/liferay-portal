@@ -13,9 +13,11 @@ import com.liferay.dynamic.data.mapping.io.DDMFormDeserializer;
 import com.liferay.dynamic.data.mapping.io.DDMFormDeserializerDeserializeRequest;
 import com.liferay.dynamic.data.mapping.io.DDMFormDeserializerDeserializeResponse;
 import com.liferay.dynamic.data.mapping.model.DDMForm;
+import com.liferay.dynamic.data.mapping.model.DDMFormField;
 import com.liferay.dynamic.data.mapping.model.DDMFormInstance;
 import com.liferay.dynamic.data.mapping.model.DDMStructure;
 import com.liferay.dynamic.data.mapping.storage.StorageType;
+import com.liferay.dynamic.data.mapping.test.util.DDMFormTestUtil;
 import com.liferay.dynamic.data.mapping.test.util.DDMStructureTestHelper;
 import com.liferay.headless.delivery.client.dto.v1_0.ContentStructure;
 import com.liferay.headless.delivery.client.dto.v1_0.ContentStructureField;
@@ -52,6 +54,7 @@ public class ContentStructureResourceTest
 		super.testGetContentStructure();
 
 		_testGetContentStructureWithOptionReference();
+		_testGetContentStructureWithUpgradedStructureFieldSet();
 	}
 
 	@Test
@@ -176,6 +179,19 @@ public class ContentStructureResourceTest
 	}
 
 	private DDMStructure _addDDMStructure(
+			long classNameId, DDMForm ddmForm, Group group, String name)
+		throws Exception {
+
+		DDMStructureTestHelper ddmStructureTestHelper =
+			new DDMStructureTestHelper(classNameId, group);
+
+		return ddmStructureTestHelper.addStructure(
+			classNameId, RandomTestUtil.randomString(), name,
+			RandomTestUtil.randomString(), ddmForm,
+			StorageType.DEFAULT.getValue(), DDMStructureConstants.TYPE_DEFAULT);
+	}
+
+	private DDMStructure _addDDMStructure(
 			long classNameId, Group group, String name)
 		throws Exception {
 
@@ -187,13 +203,8 @@ public class ContentStructureResourceTest
 			long classNameId, String fileName, Group group, String name)
 		throws Exception {
 
-		DDMStructureTestHelper ddmStructureTestHelper =
-			new DDMStructureTestHelper(classNameId, group);
-
-		return ddmStructureTestHelper.addStructure(
-			classNameId, RandomTestUtil.randomString(), name,
-			RandomTestUtil.randomString(), _deserialize(_read(fileName)),
-			StorageType.DEFAULT.getValue(), DDMStructureConstants.TYPE_DEFAULT);
+		return _addDDMStructure(
+			classNameId, _deserialize(_read(fileName)), group, name);
 	}
 
 	private DDMForm _deserialize(String content) {
@@ -249,6 +260,64 @@ public class ContentStructureResourceTest
 		Assert.assertEquals("OptionReference1", options[0].getValue());
 		Assert.assertEquals("OptionReference2", options[1].getValue());
 		Assert.assertEquals("OptionReference3", options[2].getValue());
+	}
+
+	private void _testGetContentStructureWithUpgradedStructureFieldSet()
+		throws Exception {
+
+		DDMForm ddmForm = DDMFormTestUtil.createDDMForm();
+
+		DDMFormField fieldSetDDMFormField = DDMFormTestUtil.createDDMFormField(
+			"parentStructureFieldSet", "parentStructureFieldSet", "fieldset",
+			"", false, false, false);
+
+		fieldSetDDMFormField.addNestedDDMFormField(
+			DDMFormTestUtil.createTextDDMFormField(
+				"field1", false, false, false));
+		fieldSetDDMFormField.addNestedDDMFormField(
+			DDMFormTestUtil.createTextDDMFormField(
+				"field2", false, false, false));
+		fieldSetDDMFormField.setProperty("upgradedStructure", true);
+
+		ddmForm.addDDMFormField(fieldSetDDMFormField);
+
+		ddmForm.addDDMFormField(
+			DDMFormTestUtil.createTextDDMFormField(
+				"field3", false, false, false));
+
+		DDMStructure ddmStructure = _addDDMStructure(
+			_portal.getClassNameId(JournalArticle.class), ddmForm, testGroup,
+			RandomTestUtil.randomString());
+
+		ContentStructure contentStructure =
+			contentStructureResource.getContentStructure(
+				ddmStructure.getStructureId());
+
+		ContentStructureField[] contentStructureFields =
+			contentStructure.getContentStructureFields();
+
+		Assert.assertEquals(
+			Arrays.toString(contentStructureFields), 2,
+			contentStructureFields.length);
+
+		ContentStructureField fieldSetContentStructureField =
+			contentStructureFields[0];
+
+		Assert.assertEquals(
+			"parentStructureFieldSet", fieldSetContentStructureField.getName());
+
+		ContentStructureField[] nestedContentStructureFields =
+			fieldSetContentStructureField.getNestedContentStructureFields();
+
+		Assert.assertEquals(
+			Arrays.toString(nestedContentStructureFields), 2,
+			nestedContentStructureFields.length);
+		Assert.assertEquals(
+			"field1", nestedContentStructureFields[0].getName());
+		Assert.assertEquals(
+			"field2", nestedContentStructureFields[1].getName());
+
+		Assert.assertEquals("field3", contentStructureFields[1].getName());
 	}
 
 	private ContentStructure _toContentStructure(DDMStructure structure) {

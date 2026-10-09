@@ -300,6 +300,25 @@ public class DDMStructureImplTest extends BaseDDMTestCase {
 	}
 
 	@Test
+	public void testGetRootFieldNamesWithUpgradedStructureFieldSet()
+		throws Exception {
+
+		DDMForm ddmForm = createDDMForm();
+
+		addDDMFormFields(
+			ddmForm,
+			_createUpgradedStructureFieldSetDDMFormField(
+				"parentStructureFieldSet", "field1", "field2"),
+			createTextDDMFormField("field3"));
+
+		DDMStructure structure = createStructure("Test Structure", ddmForm);
+
+		Assert.assertEquals(
+			Arrays.asList("parentStructureFieldSet", "field3"),
+			structure.getRootFieldNames());
+	}
+
+	@Test
 	public void testHasField() throws Exception {
 		DDMStructure parentStructure = createStructure(
 			"Parent Structure", "field1", "field2");
@@ -352,6 +371,18 @@ public class DDMStructureImplTest extends BaseDDMTestCase {
 		DDMStructure structure = createStructure("Test Structure", ddmForm);
 
 		Assert.assertTrue(structure.getFieldRequired("field1"));
+	}
+
+	private DDMFormField _createUpgradedStructureFieldSetDDMFormField(
+		String name, String... nestedFieldNames) {
+
+		DDMFormField ddmFormField = new DDMFormField(name, "fieldset");
+
+		addNestedTextDDMFormFields(ddmFormField, nestedFieldNames);
+
+		ddmFormField.setProperty("upgradedStructure", true);
+
+		return ddmFormField;
 	}
 
 }
